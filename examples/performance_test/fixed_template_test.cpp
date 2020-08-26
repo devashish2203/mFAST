@@ -63,6 +63,36 @@ int read_file(const char *filename, std::vector<char> &contents)
   return -1;
 }
 
+class ExampleDecoder
+{
+private:
+  mfast::malloc_allocator malloc_alloc;
+  mfast::fast_decoder m_decoder;
+
+public:
+  ExampleDecoder() : m_decoder(&malloc_alloc)
+  {
+  }
+  ~ExampleDecoder() {}
+  void initialize()
+  {
+    const mfast::templates_description *descriptions[] = {example::description()};
+    m_decoder.include(descriptions);
+  }
+  void decode(char *data, std::size_t skip_bytes, std::size_t size, bool force_reset)
+  {
+    const char *first = data + skip_bytes;
+    const char *last = data + size;
+    bool first_message = true;
+    while (first < last)
+    {
+      m_decoder.decode(first, last, force_reset || first_message);
+      first_message = false;
+      first += skip_bytes;
+    }
+  }
+};
+
 int main(int argc, const char **argv)
 {
   std::vector<char> message_contents;
@@ -123,13 +153,13 @@ int main(int argc, const char **argv)
   try
   {
 
-    mfast::malloc_allocator malloc_allc;
-    mfast::allocator *alloc = &malloc_allc;
+    // mfast::malloc_allocator malloc_allc;
+    // mfast::allocator *alloc = &malloc_allc;
 
-    const mfast::templates_description *descriptions[] = {example::description()};
+    // const mfast::templates_description *descriptions[] = {example::description()};
 
-    mfast::fast_decoder decoder(alloc);
-    decoder.include(descriptions);
+    // mfast::fast_decoder decoder(alloc);
+    // decoder.include(descriptions);
 
 #ifdef WITH_ENCODE
     mfast::fast_encoder encoder(alloc);
@@ -138,36 +168,18 @@ int main(int argc, const char **argv)
     buffer.resize(message_contents.size());
 #endif
 
-    mfast::message_type msg_value;
+    // mfast::message_type msg_value;
 
     // boost::posix_time::ptime start = boost::posix_time::microsec_clock::universal_time();
-
+    ExampleDecoder ex_decoder;
+    ex_decoder.initialize();
     typedef std::chrono::high_resolution_clock clock;
     clock::time_point start = clock::now();
     {
 
       for (std::size_t j = 0; j < repeat_count; ++j)
       {
-#ifdef WITH_ENCODE
-        char *buf_beg = &buffer[0];
-        char *buf_end = buf_beg + buffer.size();
-#endif
-        const char *first = &message_contents[0] + skip_header_bytes;
-        const char *last = &message_contents[0] + message_contents.size();
-        bool first_message = true;
-        while (first < last)
-        {
-#ifdef WITH_ENCODE
-          mfast::message_cref msg =
-#endif
-              decoder.decode(first, last, force_reset || first_message);
-
-#ifdef WITH_ENCODE
-          buf_beg += encoder.encode(msg, buf_beg, buf_end - buf_beg, force_reset || first_message);
-#endif
-          first_message = false;
-          first += skip_header_bytes;
-        }
+        ex_decoder.decode(&message_contents[0], skip_header_bytes, message_contents.size(), force_reset);
       }
     }
 
